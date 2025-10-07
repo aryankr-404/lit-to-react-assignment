@@ -33,7 +33,7 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
     const mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        frame: false,
+        frame: true,
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
@@ -75,7 +75,10 @@ function createWindow(sendToRenderer, geminiSessionRef, randomNames = null) {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     }
 
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    // mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    // mainWindow.loadFile(path.join(__dirname, 'src/react-ui/dist/index.html'));
+    mainWindow.loadURL('http://localhost:5173');
+
 
     // Set window title to random name if provided
     if (randomNames && randomNames.windowTitle) {
