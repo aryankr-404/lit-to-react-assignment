@@ -33,6 +33,19 @@ let maxReconnectionAttempts = 3;
 let reconnectionDelay = 2000; // 2 seconds between attempts
 let lastSessionParams = null;
 
+async function callSimpleTextAPI(prompt, apiKey) {
+    try {
+        const client = new GoogleGenAI({ vertexai: false, apiKey: apiKey });
+        const model = client.getGenerativeModel({ model: 'gemini-pro' });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    } catch (error) {
+        console.error('Error in callSimpleTextAPI:', error);
+        throw error; // Re-throw to be caught by the IPC handler
+    }
+}
+
 function sendToRenderer(channel, data) {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0) {
@@ -207,7 +220,7 @@ async function attemptReconnection() {
 async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnection = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
-        return false;
+        return { success: false, error: 'Session initialization already in progress' };
     }
 
     isInitializingSession = true;
@@ -274,11 +287,14 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                             currentTranscription = ''; // Reset for next turn
                         }
 
+                        // Signal completion to the UI
+                        sendToRenderer('update-status', 'Response complete');
                         messageBuffer = '';
                     }
 
                     if (message.serverContent?.turnComplete) {
-                        sendToRenderer('update-status', 'Listening...');
+                        // Signal ready for next input
+                        sendToRenderer('update-status', 'Ready');
                     }
                 },
                 onerror: function (e) {
@@ -349,12 +365,12 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
         isInitializingSession = false;
         sendToRenderer('session-initializing', false);
-        return session;
+        return { success: true, session };
     } catch (error) {
         console.error('Failed to initialize Gemini session:', error);
         isInitializingSession = false;
         sendToRenderer('session-initializing', false);
-        return null;
+        return { success: false, error: error.message || 'Failed to initialize session' };
     }
 }
 
@@ -682,6 +698,25 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         } catch (error) {
             console.error('Error updating Google Search setting:', error);
             return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.on('send-message', async (event, { prompt, key }) => {
+        console.log(`[Main Process] Received 'send-message' for React UI. Prompt: "${prompt}"`);
+        if (!prompt || !key) {
+            const errorMsg = 'Prompt or API Key is missing.';
+            console.error(`[Main Process] Error: ${errorMsg}`);
+            return sendToRenderer('receive-message', { error: errorMsg });
+        }
+        try {
+            console.log('[Main Process] Calling simple text API...');
+            const responseText = await callSimpleTextAPI(prompt, key); // This calls our new, simple function
+            console.log('[Main Process] Successfully received response.');
+            sendToRenderer('receive-message', { text: responseText });
+        } catch (error) {
+            const errorMsg = `API Error: ${error.message}`;
+            console.error(`[Main Process] An error occurred:`, errorMsg);
+            sendToRenderer('receive-message', { error: errorMsg });
         }
     });
 }

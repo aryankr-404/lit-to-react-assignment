@@ -17,15 +17,14 @@ const randomNames = initializeRandomProcessNames();
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef, randomNames);
+    setupGeminiIpcHandlers(geminiSessionRef);
     return mainWindow;
 }
 
 app.whenReady().then(async () => {
     // Apply anti-analysis measures with random delay
     await applyAntiAnalysisMeasures();
-
     createMainWindow();
-    setupGeminiIpcHandlers(geminiSessionRef);
     setupGeneralIpcHandlers();
 });
 
